@@ -19,6 +19,7 @@ class ClassificationMethods(Enum):
     MLP = 'mlp'
     SVM = 'svc'
     DT = 'DecisionTree'
+    MOE = 'MixtureOfExperts'
 
 
 class RegressionMethods(Enum):

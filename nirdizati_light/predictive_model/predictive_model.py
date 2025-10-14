@@ -134,6 +134,14 @@ class PredictiveModel:
             model = RandomForestRegressor(**config)
         elif self.model_type == ClassificationMethods.SVM.value:
             model = SVC(**config,probability=True)
+        elif self.model_type is ClassificationMethods.MOE.value:
+            input_size = config['input_size']
+            num_experts = config['num_experts']
+            topk = config['topk']
+            dropout_rate =  config['dropout_rate']
+            temperature = config['temperature']
+            model = MoE(input_size, num_experts, topk, dropout_rate, temperature)
+
         elif self.model_type is ClassificationMethods.LSTM.value:
             model = torch.nn.Sequential(
                 torch.nn.LSTM(
@@ -158,7 +166,7 @@ class PredictiveModel:
         return model
 
     def _fit_model(self, model, config=None):
-        if self.model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value]:
+        if self.model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value, ClassificationMethods.MOE.value]:
             MAX_NUM_EPOCHS = config['max_num_epochs']
 
             train_dataset = TensorDataset(torch.tensor(self.train_tensor, dtype=torch.float32), torch.tensor(self.train_label, dtype=torch.float32))
