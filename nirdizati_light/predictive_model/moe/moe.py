@@ -83,11 +83,17 @@ MoEPrediction = namedtuple('MoEPrediction', ['moe_prediction', 'choosen_expert',
 
 
 class MoE(BaseModel):
-    def __init__(self, input_size, num_experts, topk, dropout_rate=0.1, temperature=0.5):
+    def __init__(self, input_size, topk, num_experts=0, dropout_rate=0.1, temperature=0.5, experts: list[Expert] = None):
         super(MoE, self).__init__()
-        self.num_experts = num_experts
-        self.experts = nn.ModuleList([MaskedLinear(input_size, 1, topk, dropout_rate)
-                                      for _ in range(num_experts)])
+
+        if experts is not None:
+            self.num_experts = len(experts)
+            self.experts = nn.ModuleList(experts)
+
+        else:
+            self.num_experts = num_experts
+            self.experts = nn.ModuleList([MaskedLinear(input_size, 1, topk, dropout_rate) for _ in range(num_experts)])
+
         self.gate = MaskedLinear(input_size, num_experts, topk, dropout_rate)
         self.temperature = temperature
 

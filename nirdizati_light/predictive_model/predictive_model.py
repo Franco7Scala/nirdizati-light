@@ -140,7 +140,8 @@ class PredictiveModel:
             topk = config['topk']
             dropout_rate =  config['dropout_rate']
             temperature = config['temperature']
-            model = MoE(input_size, num_experts, topk, dropout_rate, temperature)
+            experts = config['experts'] or None
+            model = MoE(input_size, topk, num_experts, dropout_rate, temperature, experts)
 
         elif self.model_type is ClassificationMethods.LSTM.value:
             model = torch.nn.Sequential(
