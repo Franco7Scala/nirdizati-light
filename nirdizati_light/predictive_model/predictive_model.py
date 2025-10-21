@@ -65,7 +65,7 @@ class PredictiveModel:
         self.hyperopt_space = hyperopt_space
         self.custom_model_class = custom_model_class
 
-        if model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value]:
+        if model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value, ClassificationMethods.MOE.value]:
             self.train_tensor = get_tensor(self.train_df, prefix_length)
             self.validate_tensor = get_tensor(self.validate_df, prefix_length)
             self.test_tensor = get_tensor(self.test_df, prefix_length)
@@ -85,7 +85,7 @@ class PredictiveModel:
             self._fit_model(self.model, config)
             actual = self.full_validate_df['label']
             
-            if self.model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value]:
+            if self.model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value, ClassificationMethods.MOE.value]:
                 actual = np.array(actual.to_list())
 
             if self.model_type in [item.value for item in ClassificationMethods]:
@@ -135,13 +135,14 @@ class PredictiveModel:
         elif self.model_type == ClassificationMethods.SVM.value:
             model = SVC(**config,probability=True)
         elif self.model_type is ClassificationMethods.MOE.value:
-            input_size = config['input_size']
+            input_size = self.train_tensor.shape[2] #config['input_size']
             num_experts = config['num_experts']
             topk = config['topk']
             dropout_rate =  config['dropout_rate']
             temperature = config['temperature']
-            experts = config['experts'] or None
-            model = MoE(input_size, topk, num_experts, dropout_rate, temperature, experts)
+            pretrained_experts = config['experts'] or None
+            #model = MoE(input_size, topk, num_experts, dropout_rate, temperature, pretrained_experts, label_shape=self.train_label.shape[1])
+            model = MoE(input_size, topk, num_experts, dropout_rate, temperature, pretrained_experts)
 
         elif self.model_type is ClassificationMethods.LSTM.value:
             model = torch.nn.Sequential(
@@ -167,7 +168,7 @@ class PredictiveModel:
         return model
 
     def _fit_model(self, model, config=None):
-        if self.model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value, ClassificationMethods.MOE.value]:
+        if self.model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value]:
             MAX_NUM_EPOCHS = config['max_num_epochs']
 
             train_dataset = TensorDataset(torch.tensor(self.train_tensor, dtype=torch.float32), torch.tensor(self.train_label, dtype=torch.float32))
@@ -206,6 +207,9 @@ class PredictiveModel:
 
                 if early_stopper.early_stop(validate_loss):             
                     break
+
+        elif self.model_type is ClassificationMethods.MOE.value:
+            pass
 
         else:
             model.fit(self.train_df, self.full_train_df['label'])
