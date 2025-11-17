@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import namedtuple
 from base import BaseModel
+from expert import Expert
 
 """class MnistModel(BaseModel):
     def __init__(self, num_classes=10):

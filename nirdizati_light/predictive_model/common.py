@@ -65,6 +65,86 @@ def get_tensor(df: DataFrame, prefix_length):
 
     return tensor
 
+
+def get_tensor_alt(df, prefix_length, aggregate=True, trace_att_filter=['trace_id', 'label'],
+                   event_att_filter=['label', 'prefix', 'Prefix']):
+    def is_trace_attribute(att):
+        try:
+            return not int(att[len(att) - att[::-1].index('_'):]) > 0
+        except ValueError:
+            return True
+
+    def create_numerical_feature_list(trace, selected_attributes):
+        feature_count = 0
+        numerical_feature_list = []
+        # print('trace: ', trace)
+        for feat_name, feat_values in trace.items():
+            if feat_name in selected_attributes:
+                # print('\nisinstance(feat_values, tuple): ', isinstance(feat_values, tuple))
+                if isinstance(feat_values, tuple):
+                    # print('not inserted feature: ', feat_name, '\n \t with feat_values', feat_values)
+                    feature_count += len(feat_values)
+                else:
+                    numerical_feature_list.append(feature_count)
+                    # print('inserting feature: ', feat_name, '\n \t with count ', feature_count)
+                    feature_count += 1
+        return numerical_feature_list
+
+    trace_attributes = [att for att in df.columns if is_trace_attribute(att)]
+    event_attributes = [att[:-2] for att in df.columns if att[-2:] == '_1' and not is_trace_attribute(att)]
+    # print('trace_attributes: ', trace_attributes)
+    # print('event_attributes: ', event_attributes)
+
+    reshaped_data = {
+        trace_index: {
+            prefix_index:
+                list(flatten(
+                    feat_values if isinstance(feat_values, tuple) else [feat_values]
+                    for feat_name, feat_values in trace.items()
+                    if feat_name in [trace_attribute for trace_attribute in trace_attributes if
+                                     trace_attribute not in trace_att_filter] + [
+                        event_attribute + '_' + str(prefix_index) for event_attribute in event_attributes if
+                        event_attribute not in event_att_filter]
+                ))
+            for prefix_index in range(1, prefix_length + 1)
+        }
+        for trace_index, trace in df.iterrows()
+    }
+
+    flattened_feature_length = max(
+        len(reshaped_data[trace][prefix])
+        for trace in reshaped_data
+        for prefix in reshaped_data[trace]
+    )
+
+    trace_number = len(df)
+    tensor = torch.zeros((
+        trace_number,  # samples
+        prefix_length,  # time steps
+        flattened_feature_length  # features per single time step (trace and event attributes)
+    ))
+
+    selected_attributes = [trace_attribute for trace_attribute in trace_attributes if
+                           trace_attribute not in trace_att_filter] + [event_attribute + '_1' for event_attribute in
+                                                                       event_attributes if
+                                                                       event_attribute not in event_att_filter]
+
+    numerical_feature_list = create_numerical_feature_list(df.loc[0], selected_attributes) if aggregate else []
+    # print('numerical_feature_list: ', numerical_feature_list)
+
+    for i, trace_index in enumerate(reshaped_data):  # prefix
+        for j, prefix_index in enumerate(reshaped_data[trace_index]):  # steps of the prefix
+            for single_flattened_value in range(len(reshaped_data[trace_index][prefix_index])):
+                tensor[i, j, single_flattened_value] = reshaped_data[trace_index][prefix_index][single_flattened_value]
+                if aggregate and j in numerical_feature_list:
+                    tensor[i, j, single_flattened_value] /= trace_number
+
+    # print('tensor.shape: ', tensor.shape)
+    if aggregate:
+        return torch.sum(tensor, dim=1)
+    else:
+        return tensor
+
 def shape_label_df(df: DataFrame):
     labels_list = df['label'].tolist()
     labels = np.zeros((len(labels_list), int(max(df['label'].nunique(), int(max(df['label'].values))) + 1)))

@@ -115,7 +115,7 @@ for predictive_model_type, predictive_model_hyperopt_space in CONF['predictive_m
     custom_model_class = None
 
     # specify which custom Pytorch model to use
-    if predictive_model_type is ClassificationMethods.CUSTOM_PYTORCH.value:
+    if predictive_model_type == ClassificationMethods.CUSTOM_PYTORCH.value:
         from custom_model_example import CustomModelExample
         custom_model_class = CustomModelExample
 
@@ -150,7 +150,7 @@ actual = test_df['label']
 
 initial_result = evaluate_classifier(actual, predicted, scores)
 results = evaluate_classifiers(predictive_models,actual)
-plot_model_comparison_classification(results)
+plot_model_comparison(results)
 print(f'Evaluation: {initial_result}')
 
 print('Computing explanation...')

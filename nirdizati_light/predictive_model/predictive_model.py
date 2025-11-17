@@ -16,7 +16,9 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from xgboost import XGBClassifier,XGBRegressor
 from nirdizati_light.evaluation.common import evaluate_classifier, evaluate_regressor
-from nirdizati_light.predictive_model.common import ClassificationMethods, RegressionMethods, get_tensor, shape_label_df, LambdaModule, EarlyStopper
+from nirdizati_light.predictive_model.common import ClassificationMethods, RegressionMethods, get_tensor, \
+    shape_label_df, LambdaModule, EarlyStopper, get_tensor_alt
+from moe.moe import MoE
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,7 @@ class PredictiveModel:
         self.hyperopt_space = hyperopt_space
         self.custom_model_class = custom_model_class
 
-        if model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value, ClassificationMethods.MOE.value]:
+        if model_type in [ClassificationMethods.LSTM.value, ClassificationMethods.CUSTOM_PYTORCH.value]:
             self.train_tensor = get_tensor(self.train_df, prefix_length)
             self.validate_tensor = get_tensor(self.validate_df, prefix_length)
             self.test_tensor = get_tensor(self.test_df, prefix_length)
@@ -74,7 +76,16 @@ class PredictiveModel:
             self.validate_label = shape_label_df(self.full_validate_df)
             self.test_label = shape_label_df(self.full_test_df)
 
-        elif model_type is ClassificationMethods.MLP.value:
+        elif model_type == ClassificationMethods.MOE.value:
+            self.train_tensor = get_tensor_alt(self.train_df, prefix_length)
+            self.validate_tensor = get_tensor_alt(self.validate_df, prefix_length)
+            self.test_tensor = get_tensor_alt(self.test_df, prefix_length)
+
+            self.train_label = shape_label_df(self.full_train_df)
+            self.validate_label = shape_label_df(self.full_validate_df)
+            self.test_label = shape_label_df(self.full_test_df)
+
+        elif model_type == ClassificationMethods.MLP.value:
             self.train_label = self.full_train_df['label'].nunique()
             self.validate_label = self.full_validate_df['label'].nunique()
             self.test_label = self.full_test_df['label'].unique()
@@ -142,7 +153,7 @@ class PredictiveModel:
             temperature = config['temperature']
             pretrained_experts = config['experts'] or None
             #model = MoE(input_size, topk, num_experts, dropout_rate, temperature, pretrained_experts, label_shape=self.train_label.shape[1])
-            model = MoE(input_size, topk, num_experts, dropout_rate, temperature, pretrained_experts)
+            model = MoE(input_size, topk, num_experts, dropout_rate, temperature, pretrained_experts).to(torch.float32)
 
         elif self.model_type is ClassificationMethods.LSTM.value:
             model = torch.nn.Sequential(
@@ -209,6 +220,7 @@ class PredictiveModel:
                     break
 
         elif self.model_type is ClassificationMethods.MOE.value:
+            #FRANCESCO: IL CODICE CON IL TRAINING DEL MOE DOVE SI TROVA?
             pass
 
         else:
